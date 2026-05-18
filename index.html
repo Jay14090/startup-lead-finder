@@ -157,10 +157,11 @@ tbody tr.vis{opacity:1;transform:translateY(0);}
         <div class="fg">
           <label for="model">OpenAI Model</label>
           <select id="model">
-            <option value="gpt-4o-mini">GPT-4o Mini &#11088; (fast &amp; cheap)</option>
-            <option value="gpt-4o">GPT-4o (most capable)</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (cheapest)</option>
+            <option value="gpt-4o-search-preview">&#127760; GPT-4o Search (web grounded — no hallucination) &#11088;</option>
+            <option value="gpt-4o-mini-search-preview">&#127760; GPT-4o Mini Search (web grounded — fast)</option>
+            <option value="gpt-4o-mini">GPT-4o Mini (no web search — may hallucinate)</option>
+            <option value="gpt-4o">GPT-4o (no web search — may hallucinate)</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (cheapest, may hallucinate)</option>
           </select>
         </div>
         <div class="fg">
@@ -353,11 +354,14 @@ For each company return a JSON array with these exact keys:
 
 Return ONLY a raw JSON array. No markdown, no backticks, no explanation.`;
 
+  const isSearchModel=model.includes('search');
   const url='https://api.openai.com/v1/chat/completions';
+  const reqBody={model:model,messages:[{role:'user',content:prompt}],temperature:isSearchModel?0.2:0.7,max_tokens:4096};
+  if(isSearchModel)reqBody.web_search_options={search_context_size:'high'};
   const res=await fetch(url,{
     method:'POST',
     headers:{'Authorization':'Bearer '+apiKey.replace(/[^\x20-\x7E]/g,''),'Content-Type':'application/json'},
-    body:JSON.stringify({model:model,messages:[{role:'user',content:prompt}],temperature:0.7,max_tokens:4096})
+    body:JSON.stringify(reqBody)
   });
   if(res.status===401)throw new Error('INVALID_KEY');
   if(!res.ok||res.status===429){
