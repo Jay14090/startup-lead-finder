@@ -117,13 +117,13 @@ tbody tr.vis{opacity:1;transform:translateY(0);}
     <form id="searchForm">
       <div class="form-grid">
         <div class="fg full">
-          <label for="apiKey">OpenAI API Key <span id="keySavedBadge" style="display:none;background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid rgba(63,185,80,0.4);border-radius:12px;padding:0.15rem 0.6rem;font-size:0.75rem;font-weight:600;margin-left:0.5rem;">&#10003; Saved</span></label>
+          <label for="apiKey">Google Gemini API Key <span id="keySavedBadge" style="display:none;background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid rgba(63,185,80,0.4);border-radius:12px;padding:0.15rem 0.6rem;font-size:0.75rem;font-weight:600;margin-left:0.5rem;">&#10003; Saved</span></label>
           <div style="display:flex;gap:0.5rem;">
-            <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" style="flex:1;">
+            <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" style="flex:1;">
             <button type="button" class="btn btn-secondary" id="saveKeyBtn" style="white-space:nowrap;padding:0.7rem 1rem;">&#128190; Save Key</button>
             <button type="button" class="btn btn-danger" id="clearKeyBtn" style="padding:0.7rem 1rem;">&#10005;</button>
           </div>
-          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;">Saved in your browser only &mdash; never sent anywhere except OpenAI.</div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;">Saved in your browser only &mdash; never sent anywhere except Google.</div>
         </div>
         <div class="fg">
           <label for="niche">Industry / Niche</label>
@@ -155,13 +155,12 @@ tbody tr.vis{opacity:1;transform:translateY(0);}
           </select>
         </div>
         <div class="fg">
-          <label for="model">OpenAI Model</label>
+          <label for="model">Gemini Model</label>
           <select id="model">
-            <option value="gpt-4o-search-preview">&#127760; GPT-4o Search (web grounded — no hallucination) &#11088;</option>
-            <option value="gpt-4o-mini-search-preview">&#127760; GPT-4o Mini Search (web grounded — fast)</option>
-            <option value="gpt-4o-mini">GPT-4o Mini (no web search — may hallucinate)</option>
-            <option value="gpt-4o">GPT-4o (no web search — may hallucinate)</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (cheapest, may hallucinate)</option>
+            <option value="gemini-2.5-flash">&#127760; Gemini 2.5 Flash (Web Search Grounding) &#11088;</option>
+            <option value="gemini-2.0-flash">&#127760; Gemini 2.0 Flash (Web Search Grounding)</option>
+            <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite (Fastest)</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Most Capable)</option>
           </select>
         </div>
         <div class="fg">
@@ -354,29 +353,39 @@ For each company return a JSON array with these exact keys:
 
 Return ONLY a raw JSON array. No markdown, no backticks, no explanation.`;
 
-  const isSearchModel=model.includes('search');
-  const url='https://api.openai.com/v1/chat/completions';
-  const reqBody={model:model,messages:[{role:'user',content:prompt}],temperature:isSearchModel?0.2:0.7,max_tokens:4096};
-  if(isSearchModel)reqBody.web_search_options={search_context_size:'high'};
+  const isSearchModel=model.includes('2.0-flash')||model.includes('2.5');
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const reqBody={
+    contents:[{parts:[{text:prompt}]}],
+    generationConfig:{temperature:isSearchModel?0.2:0.7,maxOutputTokens:8192}
+  };
+  if(isSearchModel)reqBody.tools=[{googleSearch:{}}];
+  
   const res=await fetch(url,{
     method:'POST',
-    headers:{'Authorization':'Bearer '+apiKey.replace(/[^\x20-\x7E]/g,''),'Content-Type':'application/json'},
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify(reqBody)
   });
-  if(res.status===401)throw new Error('INVALID_KEY');
+  
+  if(res.status===400||res.status===401||res.status===403){
+    const e=await res.json().catch(()=>({}));
+    const msg=e.error?.message||'';
+    if(msg.toLowerCase().includes('api key')||res.status===401||res.status===403)throw new Error('INVALID_KEY');
+    throw new Error(msg||'HTTP '+res.status);
+  }
   if(!res.ok||res.status===429){
     const e=await res.json().catch(()=>({}));
     const msg=e.error?.message||'HTTP '+res.status;
     if(attempt<3){
-      const retryAfter=res.headers.get('retry-after');
-      const waitSec=retryAfter?parseInt(retryAfter)+1:(attempt+1)*10;
+      const retryMatch=msg.match(/retry in ([\d.]+)s/i);
+      const waitSec=retryMatch?Math.ceil(parseFloat(retryMatch[1]))+2:(attempt+1)*15;
       await countdown(batchNum,waitSec);
       return fetchBatch(apiKey,model,batchNum,totalBatches,batchSize,startIdx,endIdx,niche,location,size,remarks,attempt+1);
     }
     throw new Error(msg);
   }
   const data=await res.json();
-  let raw=(data.choices?.[0]?.message?.content||'').trim();
+  let raw=(data.candidates?.[0]?.content?.parts?.[0]?.text||'').trim();
   raw=raw.replace(/^```json?\s*/,'').replace(/\s*```$/,'').trim();
   const a=raw.indexOf('['),b=raw.lastIndexOf(']');
   if(a===-1||b===-1)throw new Error('No JSON array in response');
@@ -393,20 +402,20 @@ async function countdown(batchNum,secs){
 
 // Load saved key on startup
 (function(){
-  const saved=localStorage.getItem('openai_api_key');
+  const saved=localStorage.getItem('gemini_api_key');
   if(saved){$('apiKey').value=saved;$('keySavedBadge').style.display='inline';}
 })();
 
 $('saveKeyBtn').addEventListener('click',()=>{
   const k=$('apiKey').value.trim();
   if(!k)return toast('Enter a key first','wn');
-  localStorage.setItem('openai_api_key',k);
+  localStorage.setItem('gemini_api_key',k);
   $('keySavedBadge').style.display='inline';
-  toast('OpenAI API key saved!','ok');
+  toast('Gemini API key saved!','ok');
 });
 
 $('clearKeyBtn').addEventListener('click',()=>{
-  localStorage.removeItem('openai_api_key');
+  localStorage.removeItem('gemini_api_key');
   $('apiKey').value='';
   $('keySavedBadge').style.display='none';
   toast('Key cleared','wn');
@@ -416,7 +425,7 @@ form.addEventListener('submit',async e=>{
   e.preventDefault();
   const apiKey=$('apiKey').value.trim();
   // Auto-save key on each search
-  if(apiKey)localStorage.setItem('openai_api_key',apiKey);
+  if(apiKey)localStorage.setItem('gemini_api_key',apiKey);
   const niche=$('niche').value.trim();
   const location=$('location').value.trim();
   const size=$('size').value;
@@ -424,7 +433,7 @@ form.addEventListener('submit',async e=>{
   const model=$('model').value;
   const batchDelay=parseInt($('batchDelay').value);
   totalLeads=parseInt($('numLeads').value);
-  if(!apiKey)return showError('Please enter your OpenAI API key.');
+  if(!apiKey)return showError('Please enter your Google Gemini API key.');
   if(!niche)return showError('Please enter an industry / niche.');
   if(!location)return showError('Please enter a company location.');
   hideError();
@@ -462,7 +471,7 @@ form.addEventListener('submit',async e=>{
         toast(`✅ Batch ${bn} complete — ${leads.length} leads added`,'ok');
       }
     }catch(err){
-      if(err.message==='INVALID_KEY'){showError('❌ Invalid OpenAI API key. Get yours at platform.openai.com/api-keys');break;}
+      if(err.message==='INVALID_KEY'){showError('&#10060; Invalid Gemini API key. Get yours at aistudio.google.com');break;}
       toast('⚠️ Batch '+bn+' failed — skipping. '+err.message,'wn',8000);
     }
     if(b<numBatches-1&&!stopRequested){
