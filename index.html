@@ -80,6 +80,8 @@ tbody tr.vis{opacity:1;transform:translateY(0);}
 .sm{font-size:0.8rem;color:var(--muted);}
 .lk{font-size:0.8rem;}
 .em-bad{color:var(--danger)!important;}
+.url-warn{color:var(--warn)!important;}
+.warn-badge{font-size:0.7rem;color:var(--warn);border:1px solid var(--warn);border-radius:4px;padding:0.05rem 0.3rem;white-space:nowrap;margin-left:0.25rem;}
 .pain{font-size:0.8rem;color:var(--muted);line-height:1.55;max-width:240px;}
 .pitch{font-size:0.8rem;line-height:1.55;max-width:240px;}
 .remarks-cell{min-width:100px;}
@@ -260,6 +262,19 @@ function isGeneric(email){
   return GENERIC_PREFIXES.includes(pre)||GENERIC_PREFIXES.some(p=>pre===p);
 }
 
+const SUSPICIOUS_DOMAINS=['example.com','placeholder.com','company.com','yourcompany.com','website.com','domain.com','sample.com','test.com','mycompany.com','brandname.com','acme.com'];
+
+function isSuspiciousUrl(url){
+  if(!url||url==='Not found')return false;
+  try{
+    const h=new URL(url).hostname.replace(/^www\./,'').toLowerCase();
+    if(SUSPICIOUS_DOMAINS.includes(h))return true;
+    // Flag if domain looks generic or made-up
+    if(/^(company|brand|startup|business|firm|agency|studio)\d*\.(com|in|io)$/.test(h))return true;
+    return false;
+  }catch{return false;}
+}
+
 function shortUrl(url){
   if(!url||url==='Not found')return null;
   try{return new URL(url).hostname.replace(/^www\./,'');}catch{return url.slice(0,28)+(url.length>28?'…':'');}
@@ -277,7 +292,10 @@ function renderLeads(leads){
       :`${esc(lead.email||'Not found')}`;
     const siteShort=shortUrl(lead.website);
     const liShort=shortUrl(lead.linkedin);
-    const siteHtml=siteShort?`<a href="${esc(lead.website)}" target="_blank" rel="noopener" class="lk">${esc(siteShort)}</a>`:`<span class="sm">—</span>`;
+    const suspicious=isSuspiciousUrl(lead.website);
+    const siteHtml=siteShort
+      ?`<a href="${esc(lead.website)}" target="_blank" rel="noopener" class="lk${suspicious?' url-warn':''}">${esc(siteShort)}</a>${suspicious?' <span class="warn-badge" title="URL may not be real — verify manually">&#9888; unverified</span>':''}`
+      :`<span class="sm">—</span>`;
     const liHtml=liShort?`<a href="${esc(lead.linkedin)}" target="_blank" rel="noopener" class="lk">LinkedIn ↗</a>`:`<span class="sm">—</span>`;
     tr.innerHTML=`
       <td class="n">${rowNum}</td>
@@ -300,6 +318,18 @@ async function fetchBatch(apiKey,model,batchNum,totalBatches,batchSize,startIdx,
   const dontRepeat=allLeads.map(l=>l.company_name).join(', ')||'none yet';
   const sizeStr=size==='Any'?'any size':size;
   const prompt=`You are a B2B lead research assistant for a branding and digital marketing agency.
+
+Your job is to find REAL, EXISTING companies only. Every company you return must:
+- Actually exist and be currently operating
+- Have a real, live, publicly accessible website you are CERTAIN exists (not guessed or invented)
+- Be verifiable on LinkedIn
+
+STRICT RULES:
+- NEVER invent or guess a website URL. If you are not 100% sure a company's website exists, skip that company.
+- NEVER fabricate company names, websites, emails, or phone numbers.
+- If you cannot find enough real companies, return fewer entries rather than making up data.
+- Only include companies whose website domain you have actually seen or know to be real.
+
 Find ${batchSize} real companies matching ALL of the following criteria:
 - Industry/Niche: ${niche}
 - Location: ${location}
@@ -311,11 +341,11 @@ Do NOT repeat these already-found companies: ${dontRepeat}
 Do NOT include companies with only a generic support/info email.
 
 For each company return a JSON array with these exact keys:
-- company_name: string
+- company_name: string — real company name only
 - size: estimated employee count or range (e.g. "12-20 employees")
 - city: city and country only (e.g. "Mumbai, India")
-- website: full URL of company website
-- linkedin: LinkedIn company page URL
+- website: REAL, verified full URL (e.g. "https://www.brandname.com") — must be a domain you are certain is correct
+- linkedin: real LinkedIn company page URL or "Not found"
 - phone: direct phone number if findable, else "Not found"
 - email: founder or decision-maker email only - NOT info@, support@, hello@ - else "Not found"
 - pain_points: 2-3 specific pain points around branding, online presence, or digital marketing this company likely faces
@@ -466,7 +496,15 @@ $('xlsxBtn').addEventListener('click',()=>{
   ]);
   const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
   ws['!cols']=[{wch:4},{wch:25},{wch:15},{wch:18},{wch:28},{wch:28},{wch:16},{wch:28},{wch:45},{wch:45},{wch:20}];
+  // Force ALL cells to string type so Excel doesn't misread - + = @ as formulas (#NAME? fix)
   const hRange=XLSX.utils.decode_range(ws['!ref']);
+  for(let R=hRange.s.r;R<=hRange.e.r;R++){
+    for(let C=hRange.s.c;C<=hRange.e.c;C++){
+      const addr=XLSX.utils.encode_cell({r:R,c:C});
+      if(ws[addr]){ws[addr].t='s';ws[addr].v=String(ws[addr].v==null?'':ws[addr].v);}
+    }
+  }
+  // Style header row
   for(let C=hRange.s.c;C<=hRange.e.c;C++){
     const addr=XLSX.utils.encode_cell({r:0,c:C});
     if(!ws[addr])continue;
