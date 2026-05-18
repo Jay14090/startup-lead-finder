@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Startup Lead Finder — B2B Lead Generation Tool</title>
+<meta name="description" content="AI-powered B2B lead generation for branding agencies. Find qualified startup leads instantly.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--accent:#3B82F6;--accent-glow:rgba(59,130,246,0.25);--text:#e6edf3;--muted:#8b949e;--danger:#f85149;--success:#3fb950;--warn:#d29922;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6;}
+a{color:var(--accent);text-decoration:none;}a:hover{text-decoration:underline;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,#0d1117,#161b22);border-bottom:1px solid var(--border);padding:1rem 2rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:200;backdrop-filter:blur(12px);}
+.logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),#6366f1);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+.header-title{font-size:1.15rem;font-weight:700;letter-spacing:-0.02em;}
+.header-sub{font-size:0.78rem;color:var(--muted);}
+.lead-badge{margin-left:auto;background:var(--surface2);border:1px solid var(--accent);border-radius:20px;padding:0.35rem 1rem;font-size:0.82rem;font-weight:600;color:var(--accent);display:none;white-space:nowrap;}
+
+/* MAIN */
+.main{max-width:1500px;margin:0 auto;padding:2rem;}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:1.5rem;}
+.card-title{font-size:0.78rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:1.25rem;}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;}
+.fg{display:flex;flex-direction:column;gap:0.4rem;}
+.fg.full{grid-column:1/-1;}
+label{font-size:0.8rem;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;padding:0.7rem 1rem;transition:border-color 0.2s,box-shadow 0.2s;font-family:inherit;width:100%;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+input[type=password]{letter-spacing:0.1em;}
+select option{background:var(--surface2);}
+textarea{resize:vertical;min-height:80px;}
+
+/* BUTTONS */
+.btn-row{display:flex;gap:0.75rem;margin-top:1.5rem;flex-wrap:wrap;align-items:center;}
+.btn{padding:0.7rem 1.5rem;border-radius:8px;border:none;font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:0.5rem;font-family:inherit;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover:not(:disabled){background:#2563eb;transform:translateY(-1px);box-shadow:0 4px 20px var(--accent-glow);}
+.btn-primary:disabled{opacity:0.45;cursor:not-allowed;}
+.btn-danger{background:rgba(248,81,73,0.15);color:#fca5a5;border:1px solid rgba(248,81,73,0.4);}
+.btn-danger:hover{background:rgba(248,81,73,0.25);}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+#stopBtn{display:none;}
+
+/* PROGRESS */
+.progress-section{display:none;}
+.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;}
+.progress-status{font-size:0.9rem;color:var(--muted);}
+.progress-status strong{color:var(--accent);}
+.progress-track{background:var(--surface2);border-radius:8px;height:7px;overflow:hidden;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#6366f1);border-radius:8px;width:0%;transition:width 0.5s ease;}
+
+/* EXPORT */
+.export-row{display:none;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+
+/* ERROR */
+.error-box{background:rgba(248,81,73,0.1);border:1px solid var(--danger);border-radius:8px;color:var(--danger);padding:0.75rem 1rem;font-size:0.88rem;margin-top:1rem;display:none;}
+
+/* TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:none;}
+.table-scroll{overflow-x:auto;max-height:68vh;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;min-width:1200px;}
+thead{position:sticky;top:0;z-index:10;}
+thead tr{background:var(--surface2);}
+th{padding:0.8rem 0.9rem;text-align:left;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:0.8rem 0.9rem;font-size:0.85rem;border-bottom:1px solid rgba(48,54,61,0.5);vertical-align:top;}
+tbody tr:nth-child(even){background:rgba(33,38,45,0.5);}
+tbody tr:hover{background:rgba(59,130,246,0.05);}
+tbody tr{opacity:0;transform:translateY(6px);transition:opacity 0.4s ease,transform 0.4s ease;}
+tbody tr.vis{opacity:1;transform:translateY(0);}
+.n{color:var(--muted);font-weight:600;font-size:0.8rem;}
+.co{font-weight:600;}
+.sm{font-size:0.8rem;color:var(--muted);}
+.lk{font-size:0.8rem;}
+.em-bad{color:var(--danger)!important;}
+.pain{font-size:0.8rem;color:var(--muted);line-height:1.55;max-width:240px;}
+.pitch{font-size:0.8rem;line-height:1.55;max-width:240px;}
+.remarks-cell{min-width:100px;}
+
+/* EMPTY */
+.empty{text-align:center;padding:4rem 2rem;color:var(--muted);display:none;}
+.empty-icon{font-size:3rem;margin-bottom:1rem;opacity:0.5;}
+
+/* TOASTS */
+.toast-wrap{position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:0.6rem;pointer-events:none;}
+.toast{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.8rem 1.1rem;font-size:0.85rem;box-shadow:0 8px 30px rgba(0,0,0,0.5);max-width:300px;animation:tin 0.3s ease;pointer-events:all;}
+.toast.ok{border-color:var(--success);}
+.toast.wn{border-color:var(--warn);}
+.toast.er{border-color:var(--danger);}
+@keyframes tin{from{transform:translateX(110%);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes tout{from{opacity:1;}to{opacity:0;transform:translateX(110%);}}
+.toast.out{animation:tout 0.3s ease forwards;}
+
+@media(max-width:768px){.main{padding:1rem;}.card{padding:1.25rem;}.header{padding:0.9rem 1rem;}.header-sub{display:none;}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">🎯</div>
+  <div><div class="header-title">Startup Lead Finder</div><div class="header-sub">B2B Lead Generation for Branding Agencies</div></div>
+  <div class="lead-badge" id="leadBadge">0 / 0 leads found</div>
+</div>
+
+<div class="main">
+  <!-- SEARCH FORM -->
+  <div class="card">
+    <div class="card-title">Search Configuration</div>
+    <form id="searchForm">
+      <div class="form-grid">
+        <div class="fg full">
+          <label for="apiKey">OpenAI API Key <span id="keySavedBadge" style="display:none;background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid rgba(63,185,80,0.4);border-radius:12px;padding:0.15rem 0.6rem;font-size:0.75rem;font-weight:600;margin-left:0.5rem;">&#10003; Saved</span></label>
+          <div style="display:flex;gap:0.5rem;">
+            <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off" style="flex:1;">
+            <button type="button" class="btn btn-secondary" id="saveKeyBtn" style="white-space:nowrap;padding:0.7rem 1rem;">&#128190; Save Key</button>
+            <button type="button" class="btn btn-danger" id="clearKeyBtn" style="padding:0.7rem 1rem;">&#10005;</button>
+          </div>
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem;">Saved in your browser only &mdash; never sent anywhere except OpenAI.</div>
+        </div>
+        <div class="fg">
+          <label for="niche">Industry / Niche</label>
+          <input type="text" id="niche" placeholder="e.g. D2C skincare, SaaS HR tools" required>
+        </div>
+        <div class="fg">
+          <label for="location">Company Location</label>
+          <input type="text" id="location" placeholder="e.g. Bangalore India, Southeast Asia" required>
+        </div>
+        <div class="fg">
+          <label for="size">Company Size</label>
+          <select id="size">
+            <option value="Any">Any</option>
+            <option value="1-10 employees">1–10 employees</option>
+            <option value="11-50 employees">11–50 employees</option>
+            <option value="51-200 employees">51–200 employees</option>
+            <option value="200+ employees">200+ employees</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label for="numLeads">Number of Leads</label>
+          <select id="numLeads">
+            <option value="10">10 leads</option>
+            <option value="20">20 leads</option>
+            <option value="30" selected>30 leads</option>
+            <option value="50">50 leads</option>
+            <option value="75">75 leads</option>
+            <option value="100">100 leads</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label for="model">OpenAI Model</label>
+          <select id="model">
+            <option value="gpt-4o-mini">GPT-4o Mini &#11088; (fast &amp; cheap)</option>
+            <option value="gpt-4o">GPT-4o (most capable)</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (cheapest)</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label for="batchDelay">Delay Between Batches</label>
+          <select id="batchDelay">
+            <option value="2000">2 sec (recommended)</option>
+            <option value="1000">1 sec (fast)</option>
+            <option value="5000">5 sec (conservative)</option>
+            <option value="500">0.5 sec (aggressive)</option>
+          </select>
+        </div>
+        <div class="fg full">
+          <label for="remarks">Remarks (used during search)</label>
+          <textarea id="remarks" placeholder="e.g. Only bootstrapped companies, must have Instagram, avoid companies older than 3 years, focus on founders who are active on LinkedIn"></textarea>
+        </div>
+      </div>
+      <div class="error-box" id="errorBox"></div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary" id="findBtn">🔍 Find Leads</button>
+        <button type="button" class="btn btn-danger" id="stopBtn">⏹ Stop</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="card progress-section" id="progressSection">
+    <div class="progress-header">
+      <div class="progress-status" id="statusText">Initializing search…</div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- EXPORT -->
+  <div class="export-row" id="exportRow">
+    <button class="btn btn-secondary" id="xlsxBtn">📥 Export to Excel (.xlsx)</button>
+    <button class="btn btn-secondary" id="csvBtn">📋 Copy as CSV</button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap" id="tableWrap">
+    <div class="table-scroll">
+      <table id="leadsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Company Name</th>
+            <th>Size</th>
+            <th>City</th>
+            <th>Website</th>
+            <th>LinkedIn</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Pain Points</th>
+            <th>What to Pitch</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="leadsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="empty" id="emptyState">
+    <div class="empty-icon">🔍</div>
+    <p>No leads found. Try adjusting your search criteria.</p>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const GENERIC_PREFIXES=['info','support','hello','contact','admin','sales','team','enquiry','inquiry','help','office','mail','noreply','no-reply','general','post','hr','careers','press','media','marketing','billing','accounts'];
+
+let allLeads=[],stopRequested=false,foundCount=0,totalLeads=0;
+
+const $=id=>document.getElementById(id);
+const form=$('searchForm'),findBtn=$('findBtn'),stopBtn=$('stopBtn');
+const progressSection=$('progressSection'),progressFill=$('progressFill'),statusText=$('statusText');
+const tbody=$('leadsBody'),exportRow=$('exportRow'),errorBox=$('errorBox');
+const leadBadge=$('leadBadge'),tableWrap=$('tableWrap'),emptyState=$('emptyState');
+
+function showError(msg){errorBox.textContent=msg;errorBox.style.display='block';}
+function hideError(){errorBox.style.display='none';}
+function setProgress(pct){progressFill.style.width=Math.min(pct,100)+'%';}
+function setStatus(msg){statusText.innerHTML=msg;}
+function updateBadge(){leadBadge.textContent=`${foundCount} / ${totalLeads} leads found`;leadBadge.style.display='block';}
+
+function toast(msg,type='ok',dur=4000){
+  const w=$('toastWrap'),t=document.createElement('div');
+  t.className=`toast ${type}`;t.textContent=msg;w.appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),350);},dur);
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+function isGeneric(email){
+  if(!email||email==='Not found')return false;
+  const pre=email.split('@')[0].toLowerCase().replace(/[._+-].*/,'');
+  return GENERIC_PREFIXES.includes(pre)||GENERIC_PREFIXES.some(p=>pre===p);
+}
+
+function shortUrl(url){
+  if(!url||url==='Not found')return null;
+  try{return new URL(url).hostname.replace(/^www\./,'');}catch{return url.slice(0,28)+(url.length>28?'…':'');}
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function renderLeads(leads){
+  leads.forEach((lead,i)=>{
+    const rowNum=allLeads.length-leads.length+i+1;
+    const tr=document.createElement('tr');
+    const generic=isGeneric(lead.email);
+    const emailHtml=generic
+      ?`<span class="em-bad">${esc(lead.email)} <small>(generic)</small></span>`
+      :`${esc(lead.email||'Not found')}`;
+    const siteShort=shortUrl(lead.website);
+    const liShort=shortUrl(lead.linkedin);
+    const siteHtml=siteShort?`<a href="${esc(lead.website)}" target="_blank" rel="noopener" class="lk">${esc(siteShort)}</a>`:`<span class="sm">—</span>`;
+    const liHtml=liShort?`<a href="${esc(lead.linkedin)}" target="_blank" rel="noopener" class="lk">LinkedIn ↗</a>`:`<span class="sm">—</span>`;
+    tr.innerHTML=`
+      <td class="n">${rowNum}</td>
+      <td class="co">${esc(lead.company_name)}</td>
+      <td class="sm">${esc(lead.size)}</td>
+      <td class="sm">${esc(lead.city)}</td>
+      <td>${siteHtml}</td>
+      <td>${liHtml}</td>
+      <td class="sm">${esc(lead.phone||'Not found')}</td>
+      <td style="font-size:0.82rem">${emailHtml}</td>
+      <td class="pain">${esc(lead.pain_points)}</td>
+      <td class="pitch">${esc(lead.pitch)}</td>
+      <td class="remarks-cell"></td>`;
+    tbody.appendChild(tr);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>tr.classList.add('vis')));
+  });
+}
+
+async function fetchBatch(apiKey,model,batchNum,totalBatches,batchSize,startIdx,endIdx,niche,location,size,remarks,attempt=0){
+  const dontRepeat=allLeads.map(l=>l.company_name).join(', ')||'none yet';
+  const sizeStr=size==='Any'?'any size':size;
+  const prompt=`You are a B2B lead research assistant for a branding and digital marketing agency.
+Find ${batchSize} real companies matching ALL of the following criteria:
+- Industry/Niche: ${niche}
+- Location: ${location}
+- Company Size: ${sizeStr}
+- Remarks (follow strictly): ${remarks||'None'}
+
+Batch ${batchNum} of ${totalBatches}, find leads ${startIdx}-${endIdx}.
+Do NOT repeat these already-found companies: ${dontRepeat}
+Do NOT include companies with only a generic support/info email.
+
+For each company return a JSON array with these exact keys:
+- company_name: string
+- size: estimated employee count or range (e.g. "12-20 employees")
+- city: city and country only (e.g. "Mumbai, India")
+- website: full URL of company website
+- linkedin: LinkedIn company page URL
+- phone: direct phone number if findable, else "Not found"
+- email: founder or decision-maker email only - NOT info@, support@, hello@ - else "Not found"
+- pain_points: 2-3 specific pain points around branding, online presence, or digital marketing this company likely faces
+- pitch: 1-2 sentence pitch on exactly what branding/digital service our agency should offer this specific company and why they need it
+
+Return ONLY a raw JSON array. No markdown, no backticks, no explanation.`;
+
+  const url='https://api.openai.com/v1/chat/completions';
+  const res=await fetch(url,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+apiKey.replace(/[^\x20-\x7E]/g,''),'Content-Type':'application/json'},
+    body:JSON.stringify({model:model,messages:[{role:'user',content:prompt}],temperature:0.7,max_tokens:4096})
+  });
+  if(res.status===401)throw new Error('INVALID_KEY');
+  if(!res.ok||res.status===429){
+    const e=await res.json().catch(()=>({}));
+    const msg=e.error?.message||'HTTP '+res.status;
+    if(attempt<3){
+      const retryAfter=res.headers.get('retry-after');
+      const waitSec=retryAfter?parseInt(retryAfter)+1:(attempt+1)*10;
+      await countdown(batchNum,waitSec);
+      return fetchBatch(apiKey,model,batchNum,totalBatches,batchSize,startIdx,endIdx,niche,location,size,remarks,attempt+1);
+    }
+    throw new Error(msg);
+  }
+  const data=await res.json();
+  let raw=(data.choices?.[0]?.message?.content||'').trim();
+  raw=raw.replace(/^```json?\s*/,'').replace(/\s*```$/,'').trim();
+  const a=raw.indexOf('['),b=raw.lastIndexOf(']');
+  if(a===-1||b===-1)throw new Error('No JSON array in response');
+  return JSON.parse(raw.slice(a,b+1));
+}
+
+// Countdown shown in status bar while waiting for rate limit
+async function countdown(batchNum,secs){
+  for(let i=secs;i>0&&!stopRequested;i--){
+    setStatus(`Rate limit hit on batch <strong>${batchNum}</strong> — retrying in <strong>${i}s</strong>...`);
+    await sleep(1000);
+  }
+}
+
+// Load saved key on startup
+(function(){
+  const saved=localStorage.getItem('openai_api_key');
+  if(saved){$('apiKey').value=saved;$('keySavedBadge').style.display='inline';}
+})();
+
+$('saveKeyBtn').addEventListener('click',()=>{
+  const k=$('apiKey').value.trim();
+  if(!k)return toast('Enter a key first','wn');
+  localStorage.setItem('openai_api_key',k);
+  $('keySavedBadge').style.display='inline';
+  toast('OpenAI API key saved!','ok');
+});
+
+$('clearKeyBtn').addEventListener('click',()=>{
+  localStorage.removeItem('openai_api_key');
+  $('apiKey').value='';
+  $('keySavedBadge').style.display='none';
+  toast('Key cleared','wn');
+});
+
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const apiKey=$('apiKey').value.trim();
+  // Auto-save key on each search
+  if(apiKey)localStorage.setItem('openai_api_key',apiKey);
+  const niche=$('niche').value.trim();
+  const location=$('location').value.trim();
+  const size=$('size').value;
+  const remarks=$('remarks').value.trim();
+  const model=$('model').value;
+  const batchDelay=parseInt($('batchDelay').value);
+  totalLeads=parseInt($('numLeads').value);
+  if(!apiKey)return showError('Please enter your OpenAI API key.');
+  if(!niche)return showError('Please enter an industry / niche.');
+  if(!location)return showError('Please enter a company location.');
+  hideError();
+  allLeads=[];foundCount=0;stopRequested=false;
+  tbody.innerHTML='';
+  progressSection.style.display='block';
+  exportRow.style.display='none';
+  tableWrap.style.display='none';
+  emptyState.style.display='none';
+  leadBadge.style.display='none';
+  findBtn.disabled=true;
+  stopBtn.style.display='inline-flex';
+  stopBtn.disabled=false;
+  setProgress(0);
+
+  const perBatch=10;
+  const numBatches=Math.ceil(totalLeads/perBatch);
+
+  for(let b=0;b<numBatches&&!stopRequested;b++){
+    const bn=b+1;
+    const start=b*perBatch+1;
+    const end=Math.min((b+1)*perBatch,totalLeads);
+    const bSize=end-start+1;
+    setStatus(`Fetching batch <strong>${bn} of ${numBatches}</strong> — <strong>${foundCount}</strong> leads found so far`);
+    setProgress((b/numBatches)*100);
+    try{
+      const leads=await fetchBatch(apiKey,model,bn,numBatches,bSize,start,end,niche,location,size,remarks);
+      if(leads&&leads.length>0){
+        allLeads.push(...leads);
+        foundCount+=leads.length;
+        renderLeads(leads);
+        updateBadge();
+        exportRow.style.display='flex';
+        tableWrap.style.display='block';
+        toast(`✅ Batch ${bn} complete — ${leads.length} leads added`,'ok');
+      }
+    }catch(err){
+      if(err.message==='INVALID_KEY'){showError('❌ Invalid OpenAI API key. Get yours at platform.openai.com/api-keys');break;}
+      toast('⚠️ Batch '+bn+' failed — skipping. '+err.message,'wn',8000);
+    }
+    if(b<numBatches-1&&!stopRequested){
+      setStatus(`Batch <strong>${bn}</strong> done — waiting <strong>${batchDelay/1000}s</strong> before next batch...`);
+      await sleep(batchDelay);
+    }
+  }
+
+  const done=stopRequested?'Search stopped.':'Search complete!';
+  setStatus(`<strong>${done}</strong> ${foundCount} of ${totalLeads} leads found.`);
+  setProgress(100);
+  findBtn.disabled=false;
+  stopBtn.style.display='none';
+  if(foundCount===0)emptyState.style.display='block';
+  if(foundCount>0)toast(`🎉 ${done} ${foundCount} leads ready.`,'ok',6000);
+});
+
+stopBtn.addEventListener('click',()=>{
+  stopRequested=true;
+  stopBtn.disabled=true;
+  toast('🛑 Stop requested — finishing current batch…','wn');
+});
+
+// EXPORT EXCEL
+$('xlsxBtn').addEventListener('click',()=>{
+  if(!allLeads.length)return;
+  const niche=$('niche').value.trim().replace(/[^a-z0-9]/gi,'_').slice(0,20);
+  const loc=$('location').value.trim().replace(/[^a-z0-9]/gi,'_').slice(0,20);
+  const date=new Date().toISOString().slice(0,10);
+  const fname=`leads_${niche}_${loc}_${date}.xlsx`;
+  const headers=['#','Company Name','Size','City','Website','LinkedIn','Phone','Email','Pain Points','What to Pitch','Remarks'];
+  const rows=allLeads.map((l,i)=>[
+    i+1,l.company_name||'',l.size||'',l.city||'',l.website||'',l.linkedin||'',
+    l.phone||'Not found',l.email||'Not found',l.pain_points||'',l.pitch||'',''
+  ]);
+  const ws=XLSX.utils.aoa_to_sheet([headers,...rows]);
+  ws['!cols']=[{wch:4},{wch:25},{wch:15},{wch:18},{wch:28},{wch:28},{wch:16},{wch:28},{wch:45},{wch:45},{wch:20}];
+  const hRange=XLSX.utils.decode_range(ws['!ref']);
+  for(let C=hRange.s.c;C<=hRange.e.c;C++){
+    const addr=XLSX.utils.encode_cell({r:0,c:C});
+    if(!ws[addr])continue;
+    ws[addr].s={font:{bold:true},fill:{fgColor:{rgb:'DBEAFE'}},alignment:{horizontal:'center'}};
+  }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Leads');
+  XLSX.writeFile(wb,fname);
+  toast('📥 Excel file downloaded!','ok');
+});
+
+// COPY CSV
+$('csvBtn').addEventListener('click',()=>{
+  if(!allLeads.length)return;
+  const headers=['#','Company Name','Size','City','Website','LinkedIn','Phone','Email','Pain Points','What to Pitch','Remarks'];
+  const q=v=>`"${String(v||'').replace(/"/g,'""')}"`;
+  const rows=allLeads.map((l,i)=>[i+1,l.company_name,l.size,l.city,l.website,l.linkedin,l.phone||'Not found',l.email||'Not found',l.pain_points,l.pitch,''].map(q).join(','));
+  const csv=[headers.map(q).join(','),...rows].join('\n');
+  navigator.clipboard.writeText(csv).then(()=>toast('📋 CSV copied to clipboard!','ok')).catch(()=>toast('⚠️ Copy failed — try HTTPS','wn'));
+});
+</script>
+</body>
+</html>
